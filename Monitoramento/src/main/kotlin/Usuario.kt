@@ -1,10 +1,12 @@
 import java.util.*
 
 open class Usuario {
+    lateinit var nome: String
     lateinit var email: String
     lateinit var senha: String
     private var emailValido = false
     private var senhaValido = false
+    var fk_empresa:Int = 0
     var tempo_reset = Thread.sleep(3000)
 
     fun cadastrarEmail(scanner: Scanner, assistente_nocline: String) {
@@ -30,7 +32,7 @@ open class Usuario {
             senhaValido = validarSenha()
             if (!senhaValido) {
                 tempo_reset
-                println("$assistente_nocline Sua senha precisa ter no minimo 8 digitos. Tente novamente.")
+                println("$assistente_nocline Sua senha precisa ter no mínimo 8 digitos. Tente novamente.")
                 tempo_reset
             }
         }

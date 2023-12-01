@@ -1,4 +1,12 @@
+import com.github.britooo.looca.api.core.Looca
 import java.util.Scanner
+import java.util.concurrent.TimeUnit
+import java.time.LocalDateTime
+import java.util.Timer
+import java.util.TimerTask
+
+val looca = Looca()
+
 fun main() {
     val repositorio = MonitoramentoRepositorio()
     repositorio.iniciar()
@@ -19,21 +27,62 @@ fun main() {
 
     println("$assistente_nocline Tudo certo! Irei validar seu login na plataforma")
 
+    val loginRepositorio = LoginRepositorio()
+    loginRepositorio.iniciar()
 
+    if (loginRepositorio.validarLogin(novoUsuario)) {
+        println("$assistente_nocline " + loginRepositorio.comprimentar(novoUsuario))
+        println("$assistente_nocline Agora você irá prosseguir para etapa de monitoramento.")
+
+        var fk_empresa = loginRepositorio.verificarEmpresa(novoUsuario)
+        var listaDeMaquinas = loginRepositorio.mostrarMaquina(fk_empresa)
+
+        println("$assistente_nocline Digite o ID da máquina que você deseja monitorar:\n\r $listaDeMaquinas")
+        var id_maquina = scanner.nextLine().toInt()
+
+        val repositorio = DadosRepositorios()
+        repositorio.iniciar()
+
+        println("$assistente_nocline O monitoramento irá inicializar agora!")
+
+        while (true) {
+            capturar_processo(repositorio, id_maquina, fk_empresa)
+            capturar_janela(repositorio, id_maquina, fk_empresa)
+            capturar_rede(repositorio, id_maquina, fk_empresa)
+        }
+    } else {
+        println("$assistente_nocline Não conseguimos validar seu login dentro da nossa plataforma, caso você ache que isso é um erro, por favor, entre em contato conosco!")
+    }
 }
-// janela
+fun capturar_processo(repositorio: DadosRepositorios, id_maquina: Int, fk_empresa: Int) {
+    val novoProcesso = repositorio.capturarDadosP(looca)
+    repositorio.cadastrarProcesso(novoProcesso, id_maquina, fk_empresa)
+    Timer().schedule(object : TimerTask() {
+        override fun run() {
+            val novoProcesso = repositorio.capturarDadosP(looca)
+            repositorio.cadastrarProcesso(novoProcesso, id_maquina, fk_empresa)
+        }
+    }, 60000)
+}
 
-    /* Criar um Scanner para ler a entrada do terminal
-    val scanner = Scanner(System.`in`)
+fun capturar_janela(repositorio: DadosRepositorios, id_maquina: Int, fk_empresa: Int) {
+    val novaJanela = repositorio.capturarDadosJ(looca)
+    repositorio.cadastrarJanela(novaJanela, id_maquina, fk_empresa)
+    Timer().schedule(object : TimerTask() {
+        override fun run() {
+            val novaJanela = repositorio.capturarDadosJ(looca)
+            repositorio.cadastrarJanela(novaJanela, id_maquina, fk_empresa)
+        }
+    }, 60000)
+}
 
-    // Solicitar ao usuário que insira um valor
-    print("Digite um valor: ")
-
-    // Ler o valor inserido pelo usuário
-    val input = scanner.nextLine()
-
-    // Mostrar o valor inserido
-    println("Você digitou: $input")
-
-    // Fechar o scanner para liberar recursos
-    scanner.close()*/
+fun capturar_rede(repositorio: DadosRepositorios, id_maquina: Int, fk_empresa: Int) {
+    val novaRede = repositorio.capturarDadosR(looca)
+    repositorio.cadastrarRede(novaRede, id_maquina, fk_empresa)
+    Timer().schedule(object : TimerTask() {
+        override fun run() {
+            val novaRede = repositorio.capturarDadosR(looca)
+            repositorio.cadastrarRede(novaRede, id_maquina, fk_empresa)
+        }
+    }, 60000)
+}

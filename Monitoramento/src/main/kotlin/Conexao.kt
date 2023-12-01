@@ -3,10 +3,10 @@ import org.springframework.jdbc.core.JdbcTemplate
 class Conexao {
     fun conectar(): JdbcTemplate {
         val dataSource = BasicDataSource()
-        dataSource.driverClassName = "org.h2.Driver"
-        dataSource.url = "jdbc:h2:mem:bdMusica"
-        dataSource.username = "sa"
-        dataSource.password = ""
+        dataSource.driverClassName = "com.mysql.cj.jdbc.Driver"
+        dataSource.url= "jdbc:mysql://localhost:3306/nocline"
+        dataSource.username = "noc_line"
+        dataSource.password = "noc_line134#"
         return JdbcTemplate(dataSource)
     }
 }
