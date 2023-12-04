@@ -4,14 +4,19 @@ import org.springframework.jdbc.core.JdbcTemplate
 
 class LoginRepositorio {
     lateinit var jdbcTemplate: JdbcTemplate
+    lateinit var jdbcTemplate_server: JdbcTemplate
 
     fun iniciar(){
         jdbcTemplate = Conexao().conectar()
     }
 
+    fun iniciar_server() {
+        jdbcTemplate_server = Conexao().conectar_server()
+    }
+
     fun validarLogin(login: Usuario): Boolean {
         try {
-            val usuario = jdbcTemplate.queryForObject(
+            val usuario = jdbcTemplate_server.queryForObject(
                 """
             select nome, email, senha, fk_empresa from colaborador where (email = '${login.email}' and senha = '${login.senha}')
             """, BeanPropertyRowMapper(Usuario::class.java)
@@ -24,7 +29,7 @@ class LoginRepositorio {
     }
 
     fun comprimentar(login: Usuario): String {
-        val usuario = jdbcTemplate.queryForObject(
+        val usuario = jdbcTemplate_server.queryForObject(
             """
             select nome from colaborador where (email = '${login.email}' and senha = '${login.senha}')
             """, BeanPropertyRowMapper(Usuario::class.java)
@@ -36,7 +41,7 @@ class LoginRepositorio {
     }
 
     fun verificarEmpresa(login: Usuario): Int {
-        val usuario = jdbcTemplate.queryForObject(
+        val usuario = jdbcTemplate_server.queryForObject(
             """
             select fk_empresa from colaborador where (email = '${login.email}' and senha = '${login.senha}')  
             """, BeanPropertyRowMapper(Usuario::class.java)
@@ -48,7 +53,7 @@ class LoginRepositorio {
 
     fun mostrarMaquina(fk_empresa: Int): String {
 
-        val listaMaquinas: List<Maquina> = jdbcTemplate.query(
+        val listaMaquinas: List<Maquina> = jdbcTemplate_server.query(
             "select * from maquina where fk_empresaM = $fk_empresa",
             BeanPropertyRowMapper(Maquina::class.java)
         )

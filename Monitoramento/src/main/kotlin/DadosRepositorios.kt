@@ -12,15 +12,24 @@ import java.time.LocalDateTime
 class DadosRepositorios {
 
     lateinit var jdbcTemplate: JdbcTemplate
+    lateinit var jdbcTemplate_server: JdbcTemplate
 
     fun iniciar(){
         jdbcTemplate = Conexao().conectar()
     }
 
+    fun iniciar_server() {
+        jdbcTemplate_server = Conexao().conectar_server()
+    }
+
     fun cadastrarJanela(novaJanela: MutableList<Janela>?, id_maquina: Int, fk_empresa: Int) {
         val janelasNoBanco = jdbcTemplate.queryForList(
             "SELECT nome_janela FROM janela where fk_maquinaJ = $id_maquina and fk_empresaJ = $fk_empresa",
-            String::class.java
+            String::class.java)
+
+        val janelasNoBancoServer = jdbcTemplate_server.queryForList(
+                "SELECT nome_janela FROM janela where fk_maquinaJ = $id_maquina and fk_empresaJ = $fk_empresa",
+        String::class.java
         )
 
         val janelasListadas = novaJanela?.filter { it.titulo != null && it.titulo.isNotBlank() }?.map { it.titulo }
@@ -28,6 +37,7 @@ class DadosRepositorios {
         novaJanela?.forEach { janela ->
             if (janela.titulo != null && janela.titulo.isNotBlank()) {
                 val janelaExisteNoBanco = janelasNoBanco.contains(janela.titulo)
+
 
                 if (janelaExisteNoBanco) {
                     // A janela existe no banco, atualize-a definindo status_abertura como verdadeiro.
@@ -54,6 +64,34 @@ class DadosRepositorios {
                         true
                     )
                 }
+
+                val janelaExisteNoBancoServer = janelasNoBancoServer.contains(janela.titulo)
+
+                if (janelaExisteNoBancoServer) {
+                    // A janela existe no banco, atualize-a definindo status_abertura como verdadeiro.
+                    jdbcTemplate_server.update(
+                        """
+                UPDATE janela
+                SET data_hora = ?,
+                    status_abertura = ?
+                WHERE nome_janela = ? AND fk_maquinaJ = $id_maquina AND fk_empresaJ = $fk_empresa
+                """,
+                        LocalDateTime.now(),
+                        true,
+                        janela.titulo
+                    )
+                } else {
+                    // A janela não existe no banco, insira-a com status_abertura como verdadeiro.
+                    jdbcTemplate_server.update(
+                        """
+                INSERT INTO janela (nome_janela, data_hora, status_abertura, fk_maquinaJ, fk_empresaJ)
+                VALUES (?, ?, ?, $id_maquina, $fk_empresa)
+                """,
+                        janela.titulo,
+                        LocalDateTime.now(),
+                        true
+                    )
+                }
             }
         }
 
@@ -62,27 +100,17 @@ class DadosRepositorios {
             val updateQuery = "UPDATE janela SET status_abertura = ? WHERE nome_janela NOT IN ($placeholders)"
             val params = arrayOf(false, *janelasListadas.toTypedArray())
             val queryJanela = jdbcTemplate.update(updateQuery, *params)
-            println("$queryJanela registros atualizados na tabela de janelas")
+            val queryJanelaServer = jdbcTemplate_server.update(updateQuery, *params)
+            println("${queryJanela + queryJanelaServer} registros atualizados na tabela de janelas")
         }
-
     }
-
-    fun validarJanela(nome_janela: String, id_maquina: Int, fk_empresa: Int): Boolean {
-        val queryValidacao = jdbcTemplate.queryForObject(
-            "SELECT count(*) FROM janela WHERE nome_janela = ? and fk_maquinaJ = $id_maquina and fk_empresJ = $fk_empresa",
-            Int::class.java,
-            nome_janela
-        )
-        return queryValidacao > 0
-    }
-
 
     fun cadastrarRede(novaRede: Redes, id_maquina: Int, fk_empresa: Int) {
 
         var rowBytesEnviados = jdbcTemplate.update(
             """
                 insert into monitoramento (dado_coletado, data_hora, descricao, fk_componentes_monitoramento, fk_maquina_monitoramento, fk_empresa_monitoramento, fk_unidade_medida) values
-                (?,?,"bytes enviados",8,$id_maquina,$fk_empresa,1)
+                (?,?,'bytes enviados',8,$id_maquina,$fk_empresa,1)
             """,
             novaRede.bytesEnviados,
             novaRede.dataHora
@@ -91,7 +119,25 @@ class DadosRepositorios {
         var rowBytesRecebidos = jdbcTemplate.update(
             """
                 insert into monitoramento (dado_coletado, data_hora, descricao, fk_componentes_monitoramento, fk_maquina_monitoramento, fk_empresa_monitoramento, fk_unidade_medida) values
-                (?,?,"bytes recebidos",8,$id_maquina,$fk_empresa,1)
+                (?,?,'bytes recebidos',8,$id_maquina,$fk_empresa,1)
+            """,
+            novaRede.bytesRecebidos,
+            novaRede.dataHora
+        )
+
+        var rowBytesEnviadosServer = jdbcTemplate_server.update(
+            """
+                insert into monitoramento (dado_coletado, data_hora, descricao, fk_componentes_monitoramento, fk_maquina_monitoramento, fk_empresa_monitoramento, fk_unidade_medida) values
+                (?,?,'bytes enviados',(SELECT id_componente from componente WHERE nome_componente = 'REDE' and fk_maquina_componente = $id_maquina),$id_maquina,$fk_empresa,1)
+            """,
+            novaRede.bytesEnviados,
+            novaRede.dataHora
+        )
+
+        var rowBytesRecebidosServer = jdbcTemplate_server.update(
+            """
+                insert into monitoramento (dado_coletado, data_hora, descricao, fk_componentes_monitoramento, fk_maquina_monitoramento, fk_empresa_monitoramento, fk_unidade_medida) values
+                (?,?,'bytes recebidos',(SELECT id_componente from componente WHERE nome_componente = 'REDE' and fk_maquina_componente = $id_maquina),$id_maquina,$fk_empresa,1)
             """,
             novaRede.bytesRecebidos,
             novaRede.dataHora
@@ -99,8 +145,36 @@ class DadosRepositorios {
 
         println(
             """
-            $rowBytesEnviados query de bytes enviados foi registrado no banco
-            $rowBytesRecebidos query de bytes recebidos foi registrado no banco
+            ${rowBytesEnviados + rowBytesEnviadosServer} query de bytes enviados foi registrado no banco
+            ${rowBytesRecebidos + rowBytesRecebidosServer} query de bytes recebidos foi registrado no banco
+        """.trimIndent()
+        )
+
+    }
+
+    fun cadastrarRAM(novaRam: Long, id_maquina: Int, fk_empresa: Int) {
+
+        var usoRam = jdbcTemplate.update(
+            """
+                insert into monitoramento (dado_coletado, data_hora, descricao, fk_componentes_monitoramento, fk_maquina_monitoramento, fk_empresa_monitoramento, fk_unidade_medida) values
+                (?,?,'uso de ram kt',(SELECT id_componente from componente WHERE nome_componente = 'RAM' and fk_maquina_componente = $id_maquina),$id_maquina,$fk_empresa,1)
+            """,
+            novaRam,
+            LocalDateTime.now()
+        )
+
+        var usoRamServer = jdbcTemplate_server.update(
+            """
+                insert into monitoramento (dado_coletado, data_hora, descricao, fk_componentes_monitoramento, fk_maquina_monitoramento, fk_empresa_monitoramento, fk_unidade_medida) values
+                (?,?,'uso de ram kt',(SELECT id_componente from componente WHERE nome_componente = 'RAM' and fk_maquina_componente = $id_maquina),$id_maquina,$fk_empresa,1)
+            """,
+            novaRam,
+            LocalDateTime.now()
+        )
+
+        println(
+            """
+            ${usoRam + usoRamServer} query de uso de ram foi registrado no banco
         """.trimIndent()
         )
 
@@ -119,42 +193,42 @@ class DadosRepositorios {
                 val validacao = validarProcesso(p.pid, id_maquina, fk_empresa)
 
                 if (validacao) {
-                    val pid = p.pid
-                    val processoExiste = processosNoBanco.contains(pid)
-
-                    if (processoExiste) {
-                        val queryProcesso = jdbcTemplate.update(
-                            """
-                        UPDATE processos
-                        SET uso_cpu = ?,
-                            uso_memoria = ?,
-                            memoria_virtual = ?,
-                            status_abertura = ?
-                        WHERE PID = ? and fk_maquinaP = $id_maquina and fk_empresaP = $fk_empresa
-                        """,
-                            p.usoCpu,
-                            p.usoMemoria,
-                            p.memoriaVirtualUtilizada,
-                            true,
-                            pid
-                        )
-                        println("$queryProcesso registro atualizado na tabela de processos")
-                    }
-                } else {
                     val queryProcesso = jdbcTemplate.update(
                         """
-                    INSERT INTO processos (PID, uso_cpu, uso_memoria, memoria_virtual, status_abertura, fk_maquinaP, fk_empresaP)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO processos (PID, nome_processo, uso_cpu, uso_memoria, memoria_virtual, status_abertura, fk_maquinaP, fk_empresaP, data_hora)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                         p.pid,
+                        p.nome,
                         p.usoCpu,
                         p.usoMemoria,
                         p.memoriaVirtualUtilizada,
                         true,
                         id_maquina,
-                        fk_empresa
+                        fk_empresa,
+                        LocalDateTime.now()
                     )
                     println("$queryProcesso registro inserido na tabela de processos")
+                }
+
+                val validacaoServer = validarProcessoServer(p.pid, id_maquina, fk_empresa)
+                if (validacaoServer) {
+                    val queryProcesso = jdbcTemplate_server.update(
+                        """
+                    INSERT INTO processos (PID, nome_processo, uso_cpu, uso_memoria, memoria_virtual, status_abertura, fk_maquinaP, fk_empresaP, data_hora)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                        p.pid,
+                        p.nome,
+                        p.usoCpu,
+                        p.usoMemoria,
+                        p.memoriaVirtualUtilizada,
+                        true,
+                        id_maquina,
+                        fk_empresa,
+                        LocalDateTime.now()
+                    )
+                    println("$queryProcesso registro inserido na tabela de processos do server")
                 }
             }
         }
@@ -176,6 +250,14 @@ class DadosRepositorios {
         return queryValidacao > 0
     }
 
+    fun validarProcessoServer(pid: Int, id_maquina: Int, fk_empresa: Int): Boolean {
+        val queryValidacao = jdbcTemplate_server.queryForObject(
+            "SELECT count(*) FROM processos WHERE pid = ? and fk_maquinaP = $id_maquina and fk_empresaP = $fk_empresa",
+            Int::class.java,
+            pid
+        )
+        return queryValidacao > 0
+    }
 
     fun capturarDadosJ(looca: Looca): MutableList<Janela>? {
         val janela = looca.grupoDeJanelas
@@ -208,6 +290,11 @@ class DadosRepositorios {
         return listaProcessos
     }
 
+    fun capturarDadosRam(looca: Looca): Long{
+        val ram = looca.memoria
+        var uso_ram = ram.emUso
+        return uso_ram
+    }
 
 }
 

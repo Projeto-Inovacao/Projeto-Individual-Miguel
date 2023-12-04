@@ -28,7 +28,7 @@ fun main() {
     println("$assistente_nocline Tudo certo! Irei validar seu login na plataforma")
 
     val loginRepositorio = LoginRepositorio()
-    loginRepositorio.iniciar()
+    loginRepositorio.iniciar_server()
 
     if (loginRepositorio.validarLogin(novoUsuario)) {
         println("$assistente_nocline " + loginRepositorio.comprimentar(novoUsuario))
@@ -42,6 +42,7 @@ fun main() {
 
         val repositorio = DadosRepositorios()
         repositorio.iniciar()
+        repositorio.iniciar_server()
 
         println("$assistente_nocline O monitoramento irá inicializar agora!")
 
@@ -49,6 +50,7 @@ fun main() {
             capturar_processo(repositorio, id_maquina, fk_empresa)
             capturar_janela(repositorio, id_maquina, fk_empresa)
             capturar_rede(repositorio, id_maquina, fk_empresa)
+            capturar_ram(repositorio, id_maquina, fk_empresa)
         }
     } else {
         println("$assistente_nocline Não conseguimos validar seu login dentro da nossa plataforma, caso você ache que isso é um erro, por favor, entre em contato conosco!")
@@ -84,5 +86,16 @@ fun capturar_rede(repositorio: DadosRepositorios, id_maquina: Int, fk_empresa: I
             val novaRede = repositorio.capturarDadosR(looca)
             repositorio.cadastrarRede(novaRede, id_maquina, fk_empresa)
         }
-    }, 60000)
+    }, 60000)}
+
+fun capturar_ram(repositorio: DadosRepositorios, id_maquina: Int, fk_empresa: Int) {
+    val novaRam = repositorio.capturarDadosRam(looca)
+    repositorio.cadastrarRAM(novaRam, id_maquina, fk_empresa)
+    Timer().schedule(object : TimerTask() {
+        override fun run() {
+            val novaRam = repositorio.capturarDadosRam(looca)
+            repositorio.cadastrarRAM(novaRam, id_maquina, fk_empresa)
+            }
+        }, 60000)
+
 }
